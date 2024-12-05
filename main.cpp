@@ -539,26 +539,60 @@ void print(const vector<vector<string>>& result) {
 }
 
 int main() {
-    // ЭСКЬЮЭЛЬ
+    try {
         Schema schema = readSchema("schema.json");
         createDirectories(schema);
-        string sql = "INSERT INTO таблица1 VALUES петров, петр, петрович, 20";
-        Insert(sql, schema);
-        sql = "INSERT INTO таблица1 VALUES сидоров, сидр, сидорович, 40";
-        Insert(sql, schema);
-        sql = "INSERT INTO таблица1 VALUES иванов, иван, иваныч, 25";
-        Insert(sql, schema);
-        sql = "INSERT INTO таблица2 VALUES учитель, школа";
-        Insert(sql, schema);
-        sql = "INSERT INTO таблица2 VALUES бухгалтел, банк";
-        Insert(sql, schema);
-        sql = "INSERT INTO таблица2 VALUES инженер, электростанция";
-        Insert(sql, schema);
-        sql = "SELECT таблица1.колонка1, таблица2.колонка1 FROM таблица1, таблица2";
-        vector<vector<string>> result = SelectJoin(sql, schema);
-        print(result);
-        cout << endl;
-        sql = "SELECT таблица1.колонка1, таблица2.колонка1 FROM таблица1, таблица2 WHERE таблица1.колонка2 = 'string'";
-        print(result);
+
+        ifstream sqlFile("SQL.txt");
+        if (!sqlFile.is_open()) {
+            throw runtime_error("Не удалось открыть файл SQL.txt");
+        }
+
+        string sqlLine;
+        while (getline(sqlFile, sqlLine)) {
+            sqlLine.erase(0, sqlLine.find_first_not_of(" \t\n\r\f\v"));
+            sqlLine.erase(sqlLine.find_last_not_of(" \t\n\r\f\v") + 1);
+
+            if (sqlLine.empty()) continue;
+
+            size_t selectPos = sqlLine.find("SELECT");
+            size_t insertPos = sqlLine.find("INSERT INTO");
+            size_t deletePos = sqlLine.find("DELETE FROM");
+
+            try {
+                if (selectPos != string::npos) {
+                    size_t fromPos = sqlLine.find("FROM");
+                    size_t wherePos = sqlLine.find("WHERE");
+
+                    if(fromPos == string::npos){
+                        throw runtime_error("Неверный формат запроса SELECT");
+                    }
+
+                    if (wherePos != string::npos) {
+                        vector<vector<string>> result = SelectWhere(sqlLine, schema);
+                        print(result); 
+                     } else {
+                        vector<vector<string>> result = SelectJoin(sqlLine, schema);
+                        print(result);
+                    }
+                } else if (insertPos != string::npos) {
+                    Insert(sqlLine, schema);
+                    cout << "Строка успешно добавлена" << endl;
+                } else if (deletePos != string::npos) {
+                    Delete(sqlLine, schema);
+                    cout << "Строки успешно удалены" << endl;
+                } else {
+                    throw runtime_error("Неизвестная SQL-команда: " + sqlLine);
+                }
+            } catch (const runtime_error& error) {
+                cerr << "Ошибка при выполнении запроса: " << error.what() << endl;
+            }
+        }
+        sqlFile.close();
+    } catch (const runtime_error& error) {
+        cerr << "Ошибка: " << error.what() << endl;
+        return 1;
+    }
+
     return 0;
 }
